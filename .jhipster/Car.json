@@ -1,0 +1,23 @@
+{
+  "changelogDate": "20220227163030",
+  "clientRootFolder": "projetmicroback",
+  "databaseType": "mongodb",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "marque",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "prix",
+      "fieldType": "Float"
+    }
+  ],
+  "microserviceName": "projetmicroback",
+  "microservicePath": "C:\\Users\\msi\\Documents\\projetmicroback",
+  "name": "Car",
+  "pagination": "no",
+  "readOnly": false,
+  "relationships": [],
+  "service": "serviceImpl"
+}

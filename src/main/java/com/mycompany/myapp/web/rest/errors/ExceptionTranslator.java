@@ -8,7 +8,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
@@ -17,18 +16,19 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.bind.support.WebExchangeBindException;
+import org.springframework.web.server.ServerWebExchange;
 import org.zalando.problem.DefaultProblem;
 import org.zalando.problem.Problem;
 import org.zalando.problem.ProblemBuilder;
 import org.zalando.problem.Status;
 import org.zalando.problem.StatusType;
-import org.zalando.problem.spring.web.advice.ProblemHandling;
-import org.zalando.problem.spring.web.advice.security.SecurityAdviceTrait;
+import org.zalando.problem.spring.webflux.advice.ProblemHandling;
+import org.zalando.problem.spring.webflux.advice.security.SecurityAdviceTrait;
 import org.zalando.problem.violations.ConstraintViolationProblem;
+import reactor.core.publisher.Mono;
 import tech.jhipster.config.JHipsterConstants;
 import tech.jhipster.web.util.HeaderUtil;
 
@@ -57,23 +57,21 @@ public class ExceptionTranslator implements ProblemHandling, SecurityAdviceTrait
      * Post-process the Problem payload to add the message key for the front-end if needed.
      */
     @Override
-    public ResponseEntity<Problem> process(@Nullable ResponseEntity<Problem> entity, NativeWebRequest request) {
+    public Mono<ResponseEntity<Problem>> process(@Nullable ResponseEntity<Problem> entity, ServerWebExchange request) {
         if (entity == null) {
-            return null;
+            return Mono.empty();
         }
         Problem problem = entity.getBody();
         if (!(problem instanceof ConstraintViolationProblem || problem instanceof DefaultProblem)) {
-            return entity;
+            return Mono.just(entity);
         }
 
-        HttpServletRequest nativeRequest = request.getNativeRequest(HttpServletRequest.class);
-        String requestUri = nativeRequest != null ? nativeRequest.getRequestURI() : StringUtils.EMPTY;
         ProblemBuilder builder = Problem
             .builder()
             .withType(Problem.DEFAULT_TYPE.equals(problem.getType()) ? ErrorConstants.DEFAULT_TYPE : problem.getType())
             .withStatus(problem.getStatus())
             .withTitle(problem.getTitle())
-            .with(PATH_KEY, requestUri);
+            .with(PATH_KEY, request.getRequest().getPath().value());
 
         if (problem instanceof ConstraintViolationProblem) {
             builder
@@ -86,11 +84,11 @@ public class ExceptionTranslator implements ProblemHandling, SecurityAdviceTrait
                 builder.with(MESSAGE_KEY, "error.http." + problem.getStatus().getStatusCode());
             }
         }
-        return new ResponseEntity<>(builder.build(), entity.getHeaders(), entity.getStatusCode());
+        return Mono.just(new ResponseEntity<>(builder.build(), entity.getHeaders(), entity.getStatusCode()));
     }
 
     @Override
-    public ResponseEntity<Problem> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, @Nonnull NativeWebRequest request) {
+    public Mono<ResponseEntity<Problem>> handleBindingResult(WebExchangeBindException ex, @Nonnull ServerWebExchange request) {
         BindingResult result = ex.getBindingResult();
         List<FieldErrorVM> fieldErrors = result
             .getFieldErrors()
@@ -107,8 +105,8 @@ public class ExceptionTranslator implements ProblemHandling, SecurityAdviceTrait
         Problem problem = Problem
             .builder()
             .withType(ErrorConstants.CONSTRAINT_VIOLATION_TYPE)
-            .withTitle("Method argument not valid")
-            .withStatus(defaultConstraintViolationStatus())
+            .withTitle("Data binding and validation failure")
+            .withStatus(Status.BAD_REQUEST)
             .with(MESSAGE_KEY, ErrorConstants.ERR_VALIDATION)
             .with(FIELD_ERRORS_KEY, fieldErrors)
             .build();
@@ -116,7 +114,41 @@ public class ExceptionTranslator implements ProblemHandling, SecurityAdviceTrait
     }
 
     @ExceptionHandler
-    public ResponseEntity<Problem> handleBadRequestAlertException(BadRequestAlertException ex, NativeWebRequest request) {
+    public Mono<ResponseEntity<Problem>> handleEmailAlreadyUsedException(
+        com.mycompany.myapp.service.EmailAlreadyUsedException ex,
+        ServerWebExchange request
+    ) {
+        EmailAlreadyUsedException problem = new EmailAlreadyUsedException();
+        return create(
+            problem,
+            request,
+            HeaderUtil.createFailureAlert(applicationName, false, problem.getEntityName(), problem.getErrorKey(), problem.getMessage())
+        );
+    }
+
+    @ExceptionHandler
+    public Mono<ResponseEntity<Problem>> handleUsernameAlreadyUsedException(
+        com.mycompany.myapp.service.UsernameAlreadyUsedException ex,
+        ServerWebExchange request
+    ) {
+        LoginAlreadyUsedException problem = new LoginAlreadyUsedException();
+        return create(
+            problem,
+            request,
+            HeaderUtil.createFailureAlert(applicationName, false, problem.getEntityName(), problem.getErrorKey(), problem.getMessage())
+        );
+    }
+
+    @ExceptionHandler
+    public Mono<ResponseEntity<Problem>> handleInvalidPasswordException(
+        com.mycompany.myapp.service.InvalidPasswordException ex,
+        ServerWebExchange request
+    ) {
+        return create(new InvalidPasswordException(), request);
+    }
+
+    @ExceptionHandler
+    public Mono<ResponseEntity<Problem>> handleBadRequestAlertException(BadRequestAlertException ex, ServerWebExchange request) {
         return create(
             ex,
             request,
@@ -125,7 +157,7 @@ public class ExceptionTranslator implements ProblemHandling, SecurityAdviceTrait
     }
 
     @ExceptionHandler
-    public ResponseEntity<Problem> handleConcurrencyFailure(ConcurrencyFailureException ex, NativeWebRequest request) {
+    public Mono<ResponseEntity<Problem>> handleConcurrencyFailure(ConcurrencyFailureException ex, ServerWebExchange request) {
         Problem problem = Problem.builder().withStatus(Status.CONFLICT).with(MESSAGE_KEY, ErrorConstants.ERR_CONCURRENCY_FAILURE).build();
         return create(ex, problem, request);
     }

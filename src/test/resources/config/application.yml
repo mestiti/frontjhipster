@@ -31,6 +31,9 @@ mongock:
 spring:
   application:
     name: projetmicro
+  autoconfigure:
+    exclude:
+      - org.springframework.cloud.gateway.config.GatewayMetricsAutoConfiguration
   cloud:
     config:
       enabled: false
@@ -43,9 +46,6 @@ spring:
   main:
     allow-bean-definition-overriding: true
     allow-circular-references: true
-  mvc:
-    pathmatch:
-      matching-strategy: ant_path_matcher
   messages:
     basename: i18n/messages
   task:
@@ -83,11 +83,14 @@ jhipster:
       host: localhost
       port: 5000
       queue-size: 512
+  mail:
+    from: test@localhost
+    base-url: http://127.0.0.1:8080
   security:
     authentication:
       jwt:
         # This token must be encoded using Base64 (you can type `echo 'secret-key'|base64` on your command line)
-        base64-secret: NWE5YWJiNWFiODUwYWUwMDkwZThmYzcwN2QyY2Q2NGNhNGEyNDgwOTZjZjk2NTI0OTYxMWU2M2E1ZjY5ZTZlY2EwYTZiNzFmNTRlMDA0OTg5ZGM1ZjIwMmYxMjc5MjBhM2VkNmNjNjg2MjhhYTYxMDFjZmYwOWQ4YzJjMDE4YjU=
+        base64-secret: MTM0YTgxMTEzZGI2OWU0YTQ4NDg3OTY3OGJhOTI4OTIwNGQ2ODM5MGRhYjc4NDhjYThmMGVkMzQzMzY4N2EzNDE0NzdlN2Y3MzA0NTU1NWUzNzA4ZGQzYzZkOGQ3ODhlOThiYmFiODhiNDk2MWE5NjdkZjExYjhhMjM0OTI3YTU=
         # Token is valid 24 hours
         token-validity-in-seconds: 86400
 # ===================================================================
